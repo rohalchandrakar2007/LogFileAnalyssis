@@ -14,31 +14,46 @@
             </Button.BorderBrush>
         </Button>
         <Rectangle Fill="#FF080808" HorizontalAlignment="Left" Height="2" Margin="9,60,0,0" Stroke="Black" VerticalAlignment="Top" Width="781" StrokeThickness="0"/>
-        <Button x:Name="buttonProcess" Content="Process" HorizontalAlignment="Left" Margin="10,574,0,0" VerticalAlignment="Top" Width="781" Height="54" Click="Button_Click_2" Background="{x:Null}" FontSize="36">
+        <Button x:Name="buttonProcess" Content="Process" HorizontalAlignment="Left" Margin="436,206,0,0" VerticalAlignment="Top" Width="344" Height="30" Click="Button_Click_2" Background="{x:Null}" FontSize="14">
             <Button.BorderBrush>
                 <SolidColorBrush Color="{DynamicResource {x:Static SystemColors.AppWorkspaceColorKey}}"/>
             </Button.BorderBrush>
         </Button>
         <Button x:Name="bOpenFileDialog" Content="Open File"
-                 Height="30" Width="344" Margin="446,84,0,0"
+                 Height="30" Width="344" Margin="436,112,0,0"
                  HorizontalAlignment="Left" VerticalAlignment="Top" 
                  Click="bOpenFileDialog_Click" Background="{x:Null}" BorderBrush="{DynamicResource {x:Static SystemColors.AppWorkspaceBrushKey}}" FontSize="14" />
 
         <TextBox x:Name="filePath"
-                 Height="30" Width="320" Margin="31,84,0,0"
+                 Height="30" Width="320" Margin="21,112,0,0"
                  HorizontalAlignment="Left" VerticalAlignment="Top" 
                   />
         
         <Label x:Name="statusBar" Content="Status Bar..." HorizontalAlignment="Left" Margin="10,631,0,0" VerticalAlignment="Top" Width="780" Height="32"/>
-        <ComboBox x:Name="sessionTimeComboBox" HorizontalAlignment="Left" Margin="31,178,0,0" VerticalAlignment="Top" Width="320" BorderThickness="1" RenderTransformOrigin="0.5,0.5" Background="{x:Null}" BorderBrush="{DynamicResource {x:Static SystemColors.AppWorkspaceBrushKey}}" Height="26" Cursor="" IsEnabled="False" >
+        <ComboBox x:Name="sessionTimeComboBox" HorizontalAlignment="Left" Margin="21,206,0,0" VerticalAlignment="Top" Width="320" BorderThickness="1" RenderTransformOrigin="0.5,0.5" Background="{x:Null}" BorderBrush="{DynamicResource {x:Static SystemColors.AppWorkspaceBrushKey}}" Height="30" Cursor="" IsEnabled="False" >
             <ComboBox.ContextMenu>
                 <ContextMenu>
                     <TabItem Content="dsgfdsgfds"/>
                 </ContextMenu>
             </ComboBox.ContextMenu>
         </ComboBox>
-        <CheckBox x:Name="sessionTimeCheckBox" Content="        Select Session Time" HorizontalAlignment="Left" Margin="91,138,0,0" VerticalAlignment="Top" Width="183" Checked="sessionTimeCheckBox_Checked" Unchecked="sessionTimeCheckBox_Unchecked" Background="{x:Null}"/>
-        <CheckBox x:Name="userAgentInvolved" Content="        User Agent" HorizontalAlignment="Left" Margin="534,138,0,0" VerticalAlignment="Top" Width="183" Background="{x:Null}" Checked="userAgentInvolved_Checked" Unchecked="userAgentInvolved_Unchecked"/>
+        <CheckBox x:Name="sessionTimeCheckBox" Content="        Select Session Time" HorizontalAlignment="Left" Margin="81,166,0,0" VerticalAlignment="Top" Width="183" Checked="sessionTimeCheckBox_Checked" Unchecked="sessionTimeCheckBox_Unchecked" Background="{x:Null}"/>
+        <CheckBox x:Name="userAgentInvolved" Content="        User Agent" HorizontalAlignment="Left" Margin="524,166,0,0" VerticalAlignment="Top" Width="183" Background="{x:Null}" Checked="userAgentInvolved_Checked" Unchecked="userAgentInvolved_Unchecked"/>
+        <Rectangle Fill="#FF080808" HorizontalAlignment="Left" Height="2" Margin="9,256,0,0" Stroke="Black" VerticalAlignment="Top" Width="781" StrokeThickness="0"/>
+        <Label Content="Session Identification :" HorizontalAlignment="Left" Margin="19,59,0,0" VerticalAlignment="Top" Width="381" Height="62" FontSize="32"/>
+        <Label Content="Session Classification :" HorizontalAlignment="Left" Margin="17,259,0,0" VerticalAlignment="Top" Width="381" Height="62" FontSize="32"/>
+        <CheckBox x:Name="classifyWithInputDatabase" Content="Databse Input for Classification" HorizontalAlignment="Left" Margin="81,322,0,0" VerticalAlignment="Top" Width="183" Checked="sessionTimeCheckBox_Checked" Unchecked="sessionTimeCheckBox_Unchecked" Background="{x:Null}"/>
+        <Button x:Name="bOpenFileDialog_Copy" Content="Open File"
+        	Height="30" Width="344" Margin="436,354,0,0"
+        	HorizontalAlignment="Left" VerticalAlignment="Top" 
+        	Click="bOpenFileDialog_Click" Background="{x:Null}" BorderBrush="{DynamicResource {x:Static SystemColors.AppWorkspaceBrushKey}}" FontSize="14" />
+        <TextBox x:Name="filePath_Copy"
+        	Height="30" Width="320" Margin="21,354,0,0"
+        	HorizontalAlignment="Left" VerticalAlignment="Top" 
+                  />
+        <Rectangle Fill="#FF080808" HorizontalAlignment="Left" Height="2" Margin="9,454,0,0" Stroke="Black" VerticalAlignment="Top" Width="781" StrokeThickness="0"/>
+        <Button x:Name="classify" Content="Classify" HorizontalAlignment="Left" Margin="436,407,0,0" VerticalAlignment="Top" Width="344" RenderTransformOrigin="0.5,2" Height="30" Click="classify_Click" Background="{x:Null}" BorderBrush="#FF767676"/>
+
 
     </Grid>
 </Window>

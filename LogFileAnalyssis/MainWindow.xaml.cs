@@ -18,6 +18,7 @@ using Finisar.SQLite;
 using System.IO;
 using System.Data;
 using System.Collections;
+using System.Data.SqlClient;
 
 namespace LogFileAnalyssis
 {
@@ -28,6 +29,10 @@ namespace LogFileAnalyssis
     public class Session
     {
         public int sessionId;
+        public string sessionUsername;
+        public string sessionUseragent;
+        public int sessionType;
+        public bool isRobotSession;
         public List<int> requestIdlist = new List<int>();
 
         /* features variables for the session class */
@@ -53,7 +58,7 @@ namespace LogFileAnalyssis
         public long depthOfTheTraversal;
         public bool isMultipleIPSEssion;
         public bool isMultiAgentSession;
-
+      
         /* Features for classifiying the Session */
         public bool isRobotstxtVisited;
         public long noOfRequestWithHEADMethod;
@@ -61,7 +66,7 @@ namespace LogFileAnalyssis
 
         public DateTime sessionStartTime;
 
-        public Session(int id)
+        public Session(int id, string un, string ua, string[] type1, string[] type2, string[] type3, string[] type4)
         {
             sessionId = id;
             totalNoOfPagesRequestedInSession = 0;
@@ -89,6 +94,24 @@ namespace LogFileAnalyssis
             isRobotstxtVisited = false;
             noOfRequestWithHEADMethod = 0;
             noOfRequestWithUnassignedReferer = 0;
+
+            sessionUsername = un;
+            sessionUseragent = ua;
+            sessionType = getSessionType(ua, type1, type2, type3, type4);
+            isRobotSession = false;
+            
+        }
+        private int getSessionType(string ua , string[] type1, string[] type2, string[] type3, string[] type4)
+        {
+            if (Array.Exists(type1, element => element == ua))
+                return 1;
+            if (Array.Exists(type2, element => element == ua))
+                return 2;
+            if (Array.Exists(type3, element => element == ua))
+                return 3;
+            if (Array.Exists(type4, element => element == ua))
+                return 4;
+            return 0;
         }
     }
 
@@ -221,7 +244,9 @@ namespace LogFileAnalyssis
                 sql_con.Close();
             }
             catch(Exception e)
-            {}
+            {
+            
+            }
             }
         private void LoadData()
         {
@@ -253,6 +278,10 @@ ExecuteQuery(txtSQLQuery);
         Hashtable sessionNametoIdhashtable = new Hashtable();
         List<Session> session = new List<Session>();
         List<Request> requestList = new List<Request>();
+        List<string> type1 = new List<string>();
+        List<string> type2 = new List<string>();
+        List<string> type3 = new List<string>();
+        List<string> type4 = new List<string>();
         int countLines = -1;
         int sessionId =-1,tempInt=0 , sessionTag =0;
         private SQLiteConnection sql_con;
@@ -276,6 +305,42 @@ ExecuteQuery(txtSQLQuery);
             sessionTimeComboBox.Items.Add("30");
             sessionTimeComboBox.Items.Add("35");
             sessionTimeComboBox.SelectedValue = "Select Session Time in Minuts";
+
+            /* Update the constrains for clssifiying session by useragents */
+            System.IO.StreamReader file =
+            new System.IO.StreamReader("sessionUseragent.txt");
+            int typeCount = 0;
+            string line;
+            while ((line = file.ReadLine()) != null)
+            {
+                if (line.Equals("Type1") || line.Equals("Type2") || line.Equals("Type3") || line.Equals("Type4"))
+                {
+                    if (line.Equals("Type1"))
+                        typeCount = 1;
+                    if (line.Equals("Type2"))
+                        typeCount = 2;
+                    if (line.Equals("Type3"))
+                        typeCount = 3;
+                    if (line.Equals("Type4"))
+                        typeCount = 4;
+                }
+                else
+                {
+                    if (typeCount == 1)
+                        type1.Add(line);
+                    if (typeCount == 2)
+                        type2.Add(line);
+                    if (typeCount == 3)
+                        type3.Add(line);
+                    if (typeCount == 4)
+                        type4.Add(line);
+
+                }
+                //Console.WriteLine(line);
+               // counter++;
+            }
+
+            file.Close();
         }
 
         private void Button_Click_1(object sender, RoutedEventArgs e)
@@ -328,16 +393,11 @@ ExecuteQuery(txtSQLQuery);
                     {
                         sessionId++;
                         sessionNametoIdhashtable.Add(requestList[countLines].userName + " " + requestList[countLines].userAgent + sessionTag, sessionId);
-                        session.Add(new Session(sessionId));
+                        session.Add(new Session(sessionId , requestList[countLines].userName , requestList[countLines].userAgent , type1.ToArray() , type2.ToArray() , type3.ToArray() ,type4.ToArray()));
                         session[sessionId].sessionStartTime = requestList[countLines].timeStamp;
                        
                         session[sessionId].requestIdlist.Add(countLines);
                         UpdateSessionClassVariables();
-                        
-                        //if ( timeDiffSession > 30)
-                        //    sessionTag++;
-
-
                     }
                     else
                     {
@@ -345,17 +405,14 @@ ExecuteQuery(txtSQLQuery);
                         UpdateSessionClassVariables();
 
                     }
-                    
-                    //GC.Collect();
-                    //GC.WaitForPendingFinalizers();
                 }
                 CleanDataBase();
+
                 /* code for inserting into database */
                 statusBar.Content = "Please Wait (Inserting session detailsinto database...)";
                 for (int i = 0; i < sessionId - 1; i++)
                 {
-
-                    UpdateDataBase(i);
+                  UpdateDataBase(i);
                 }
                 
                 statusBar.Content = "Processing Completed...";
@@ -376,14 +433,17 @@ ExecuteQuery(txtSQLQuery);
             string txtSQLQuery = "Delete from session" ;
             ExecuteQuery(txtSQLQuery);
         }
+
         private void UpdateStatusBar()
         {
            // statusBar.Content = statusCode;
         }
+
         private void CustomAnimation()
         {
             statusBar.Content = 3;
         }
+
         private void UpdateSessionClassVariables()
         {
             DateTime tFirstHTMLReq = session[sessionId].sessionStartTime, tLastHTMLReq = session[sessionId].sessionStartTime;
@@ -472,46 +532,58 @@ ExecuteQuery(txtSQLQuery);
                 {
                     session[sessionId].noOfRequestWithUnassignedReferer++;
                 }
+
             }
             catch(Exception e)
             {}
         }
+
         private void UpdateDataBase(int tempSessionId)
         {
-            int p1 = tempSessionId;
-            long p2 = session[tempSessionId].totalNoOfPagesRequestedInSession;
-            float p3 = ((float)session[tempSessionId].noOfImagePagesRequestedInSession / p2) * 100;
-            float p4 = ((float)session[tempSessionId].noOfBinaryDocumentsRequestedInSession / p2) * 100;
-            float p5 = ((float)session[tempSessionId].noOfBinaryExeFileRequestedInSession / p2) * 100;
-            String p6 = session[tempSessionId].isRobotstxtVisited.ToString();
-            float p7 = ((float)session[tempSessionId].noOfHTMLFileRequestedInSession / p2) * 100;
-            float p8 = ((float)session[tempSessionId].noOfAsciiFilerequestedInSession / p2) * 100;
-            float p9 = ((float)session[tempSessionId].noOfCompressedFileRequestedInSession / p2) * 100;
-            float p10 = ((float)session[tempSessionId].noOfMultimediaFileRequestedInSession / p2) * 100;
-            float p11 = ((float)session[tempSessionId].noOfOtherFileFormatRequestedInSession / p2) * 100;
-            float p12 = System.Math.Abs(session[tempSessionId].totalTimeOfTheSession);
-            float p13 = System.Math.Abs(session[tempSessionId].avgTimeBetweenTowHTMLRequests);
-            long p14 = session[tempSessionId].noOfPagesRequestedInNightTime;
-            long p15 = session[tempSessionId].noOfRequestReapted;
-            float p16 = ((float)session[tempSessionId].onOfrequestesWithErrors / p2) * 100;
-            float p17 = ((float)session[tempSessionId].noOfRequestWithGETMethod / p2) * 100;
-            float p18 = ((float)session[tempSessionId].noOfRequestWithPOSTMethod / p2) * 100;
-            float p19 = ((float)session[tempSessionId].noOfRequestWithHEADMethod / p2) * 100;
-            float p20 = ((float)session[tempSessionId].noOfRequestWithOtherMethod / p2) * 100;
-            long p21 = session[tempSessionId].depthOfTheTraversal;
-            long p22 = session[tempSessionId].noOfHTMLFileRequestedInSession;
-            float p23 = ((float)session[tempSessionId].noOfRequestWithUnassignedReferer / p2) * 100;
-            String p24 = session[tempSessionId].isMultipleIPSEssion.ToString();
-            String p25 = session[tempSessionId].isMultiAgentSession.ToString();
+            try
+            {
+                int p1 = tempSessionId;
+                long p2 = session[tempSessionId].totalNoOfPagesRequestedInSession;
+                float p3 = ((float)session[tempSessionId].noOfImagePagesRequestedInSession / p2) * 100;
+                float p4 = ((float)session[tempSessionId].noOfBinaryDocumentsRequestedInSession / p2) * 100;
+                float p5 = ((float)session[tempSessionId].noOfBinaryExeFileRequestedInSession / p2) * 100;
+                String p6 = session[tempSessionId].isRobotstxtVisited.ToString();
+                float p7 = ((float)session[tempSessionId].noOfHTMLFileRequestedInSession / p2) * 100;
+                float p8 = ((float)session[tempSessionId].noOfAsciiFilerequestedInSession / p2) * 100;
+                float p9 = ((float)session[tempSessionId].noOfCompressedFileRequestedInSession / p2) * 100;
+                float p10 = ((float)session[tempSessionId].noOfMultimediaFileRequestedInSession / p2) * 100;
+                float p11 = ((float)session[tempSessionId].noOfOtherFileFormatRequestedInSession / p2) * 100;
+                float p12 = System.Math.Abs(session[tempSessionId].totalTimeOfTheSession);
+                float p13 = System.Math.Abs(session[tempSessionId].avgTimeBetweenTowHTMLRequests);
+                long p14 = session[tempSessionId].noOfPagesRequestedInNightTime;
+                long p15 = session[tempSessionId].noOfRequestReapted;
+                float p16 = ((float)session[tempSessionId].onOfrequestesWithErrors / p2) * 100;
+                float p17 = ((float)session[tempSessionId].noOfRequestWithGETMethod / p2) * 100;
+                float p18 = ((float)session[tempSessionId].noOfRequestWithPOSTMethod / p2) * 100;
+                float p19 = ((float)session[tempSessionId].noOfRequestWithHEADMethod / p2) * 100;
+                float p20 = ((float)session[tempSessionId].noOfRequestWithOtherMethod / p2) * 100;
+                long p21 = session[tempSessionId].depthOfTheTraversal;
+                long p22 = session[tempSessionId].noOfHTMLFileRequestedInSession;
+                float p23 = ((float)session[tempSessionId].noOfRequestWithUnassignedReferer / p2) * 100;
+                String p24 = session[tempSessionId].isMultipleIPSEssion.ToString();
+                String p25 = session[tempSessionId].isMultiAgentSession.ToString();
+                String p26 = session[tempSessionId].sessionUsername.ToString();
+                String p27 = session[tempSessionId].sessionUseragent.ToString();
+                int p28 = session[tempSessionId].sessionType;
+                String p29 = session[tempSessionId].isRobotSession.ToString();
 
-            string txtSQLQuery = "insert into  session values ('" + p1 + "','" + p2 + "','" + p3 + "','" + p4 + "','" + p5 + "','" + p6 + "','" + p7 + "','" + p8 + "','" + p9 + "','" + p10 + "','" + p11 + "','" + p12 + "','" + p13 + "','" + p14 + "','" + p15 + "','" + p16 + "','" + p17 + "','" + p18 + "','" + p19 + "','" + p20 + "','" + p21 + "','" + p22 + "','" + p23 + "','" + p24 + "','" + p25 + "')";
-            ExecuteQuery(txtSQLQuery);
+                string txtSQLQuery = "insert into  session values ('" + p1 + "','" + p2 + "','" + p3 + "','" + p4 + "','" + p5 + "','" + p6 + "','" + p7 + "','" + p8 + "','" + p9 + "','" + p10 + "','" + p11 + "','" + p12 + "','" + p13 + "','" + p14 + "','" + p15 + "','" + p16 + "','" + p17 + "','" + p18 + "','" + p19 + "','" + p20 + "','" + p21 + "','" + p22 + "','" + p23 + "','" + p24 + "','" + p25 + "','" + p26 + "','" + p27 + "','" + p28 + "','" + p29 + "')";
+                ExecuteQuery(txtSQLQuery);
+            }
+            catch(Exception e)
+            {}
         }
+
         private void SetConnection()
         {
-            sql_con = new SQLiteConnection
-                ("Data Source=RequestTable;Version=3;New=False;Compress=True;");
+            sql_con = new SQLiteConnection("Data Source=RequestTable;Version=3;New=False;Compress=True;");
         }
+
         private void ExecuteQuery(string txtQuery)
         {
             try
@@ -526,19 +598,22 @@ ExecuteQuery(txtSQLQuery);
             catch (Exception e)
             { }
         }
+
         private void LoadData()
         {
-            //SetConnection();
-            //sql_con.Open();
-            //sql_cmd = sql_con.CreateCommand();
-            //string CommandText = "select id, desc from mains";
-            //DB = new SQLiteDataAdapter(CommandText, sql_con);
-            //DS.Reset();
-            //DB.Fill(DS);
-            //DT = DS.Tables[0];
+            SetConnection();
+            sql_con.Open();
+            sql_cmd = sql_con.CreateCommand();
+            string CommandText = "select * from session";
+            DB = new SQLiteDataAdapter(CommandText, sql_con);
+            DS.Reset();
+            DB.Fill(DS);
+            DT = DS.Tables[0];
+            statusBar.Content = DT.Rows[3]["totalPages"].ToString();
             //Grid.DataSource = DT;
-            //sql_con.Close();
+            sql_con.Close();
         }
+
         private void Add()
         {
             int i = 9;
@@ -546,6 +621,7 @@ ExecuteQuery(txtSQLQuery);
            // string txtSQLQuery = "insert into  test values ('" + i.ToString() + "','" + sa + "')";
            // ExecuteQuery(txtSQLQuery);
         }
+
         private void bOpenFileDialog_Click(object sender, RoutedEventArgs e)
         {
             Stream checkStream = null;
@@ -579,6 +655,7 @@ ExecuteQuery(txtSQLQuery);
                    System.Windows.MessageBox.Show("Problem occured, try again later");
             }
         }
+
         private bool isNewSession(String tempSessionName)
         {
             return true;
@@ -602,6 +679,52 @@ ExecuteQuery(txtSQLQuery);
         private void userAgentInvolved_Unchecked(object sender, RoutedEventArgs e)
         {
             isUserAgentInvolved = false;
+        }
+
+        private void buttonClassify(object sender, RoutedEventArgs e)
+        {
+
+        }
+
+        private void dataBaseOperationForClassification()
+        {
+            try
+            {
+               // statusBar.Content = "2";
+                //SqLiteConnection connection1 =  new SQLiteConnection("Data Source=RequestTable;Version=3;New=False;Compress=True;");
+                //{
+                //    //SetConnection();
+                //    string query = "SELECT * FROM session";
+                //    SQLiteCommand command = new SQLiteCommand(query, connection1);
+                    //connection1.Open();
+                SetConnection();
+            sql_con.Open();
+                sql_cmd = sql_con.CreateCommand();
+                sql_cmd.CommandText = "SELECT * FROM session";
+                    statusBar.Content = "1";
+                    using (SQLiteDataReader reader = sql_cmd.ExecuteReader())
+                    {
+                        statusBar.Content = "2";
+                        while (reader.Read())
+                        {
+                            statusBar.Content = reader.GetString(1);
+                        }
+                        // users.Add(reader.GetInt32(0), reader.GetString(1));
+                        reader.Close();
+                    }
+                    sql_con.Close();
+                }
+            
+            catch(Exception e)
+            {
+                statusBar.Content = "Exception occured!!!";
+            }
+        }
+
+        private void classify_Click(object sender, RoutedEventArgs e)
+        {
+           // dataBaseOperationForClassification();
+            LoadData();
         }
 
         
