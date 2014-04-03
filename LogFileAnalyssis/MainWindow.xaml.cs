@@ -19,6 +19,8 @@ using System.IO;
 using System.Data;
 using System.Collections;
 using System.Data.SqlClient;
+using OxyPlot;
+using OxyPlot.Series;
 
 namespace LogFileAnalyssis
 {
@@ -296,6 +298,7 @@ ExecuteQuery(txtSQLQuery);
         public MainWindow()
         {
             InitializeComponent();
+            
             sessionTimeComboBox.Items.Add("Select Session Time in Minuts");
             sessionTimeComboBox.Items.Add("5");
             sessionTimeComboBox.Items.Add("10");
@@ -342,7 +345,7 @@ ExecuteQuery(txtSQLQuery);
 
             file.Close();
         }
-
+        public PlotModel MyModel { get; private set; }
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
             Close();
@@ -599,17 +602,17 @@ ExecuteQuery(txtSQLQuery);
             { }
         }
 
-        private void LoadData()
+        private void LoadData(String selectQuery)
         {
             SetConnection();
             sql_con.Open();
             sql_cmd = sql_con.CreateCommand();
-            string CommandText = "select * from session";
+            string CommandText = selectQuery;
             DB = new SQLiteDataAdapter(CommandText, sql_con);
             DS.Reset();
             DB.Fill(DS);
             DT = DS.Tables[0];
-            statusBar.Content = DT.Rows[3]["totalPages"].ToString();
+            //statusBar.Content = DT.Rows[3]["totalPages"].ToString();
             //Grid.DataSource = DT;
             sql_con.Close();
         }
@@ -724,7 +727,31 @@ ExecuteQuery(txtSQLQuery);
         private void classify_Click(object sender, RoutedEventArgs e)
         {
            // dataBaseOperationForClassification();
-            LoadData();
+            statusBar.Content = "Detecting Robots sessions...";
+            LoadData("select sessionId , isRobotstxtVisited , percentageHEADMethodReq , percentageReqWithUnassignedReferrer , sessionUsername , sessionUseragent , useAgentType from session");
+            int lableCount = 0;
+            for (;lableCount<DT.Rows.Count ;lableCount++)
+            {
+                if (DT.Rows[lableCount]["isRobotstxtVisited"].ToString().Equals("True"))
+                { 
+                    /* Class 1 */
+                    ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
+                }
+                if (DT.Rows[lableCount]["useAgentType"].ToString().Equals("2") || DT.Rows[lableCount]["useAgentType"].ToString().Equals("4") || DT.Rows[lableCount]["useAgentType"].ToString().Equals("0"))
+                { 
+                    /* Class 0 */
+                    if (DT.Rows[lableCount]["percentageHEADMethodReq"].ToString().Equals("100") || (DT.Rows[lableCount]["percentageReqWithUnassignedReferrer"].ToString().Equals("100") && !DT.Rows[lableCount]["percentageReqWithUnassignedReferrer"].ToString().Equals("")))
+                    {
+                        /* Class 1 */
+                        ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
+                    }
+                }
+                else
+                { 
+                    /* Class 1 */
+                    ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
+                }
+            }
         }
 
         
