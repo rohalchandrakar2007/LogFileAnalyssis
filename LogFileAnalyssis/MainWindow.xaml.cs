@@ -103,6 +103,7 @@ namespace LogFileAnalyssis
             isRobotSession = false;
             
         }
+
         private int getSessionType(string ua , string[] type1, string[] type2, string[] type3, string[] type4)
         {
             if (Array.Exists(type1, element => element == ua))
@@ -125,14 +126,14 @@ namespace LogFileAnalyssis
         //openLogFile.DefaultExt = ".txt"; // Default file extension
         //openLogFile.Filter = "Text documents (.txt)|*.txt"; // Filter files by extension
         public String userName;
-        public String visitingPath;
-        public String pathTraversed;
+        //public String visitingPath;
+        //public String pathTraversed;
         public DateTime timeStamp;
         public String pageLastVisited;
         public String sucessRate;
         
-        public String url;                               //from where the client has been redirected to the current page
-        public String userAgent;
+        public String url="";                               //from where the client has been redirected to the current page
+        public String userAgent="";
         public String logFormatType="common";                     // "combined" or "common" 
         public String pageRequestMethod;                   // GET or POST
 
@@ -149,10 +150,9 @@ namespace LogFileAnalyssis
             if (s.Length > 8)
             {
                 userName = s[0];
-                visitingPath = s[1];
-                pathTraversed = s[2];
-                timeStamp = DateTime.Parse(dateParseBritishFormat(s[3]));// +" " + s[4];
-                
+                //visitingPath = s[1];
+                //pathTraversed = s[2];
+                timeStamp = DateTime.Parse(dateParseBritishFormat(s[3]));
                 pageLastVisited = s[6];
                 pageRequestMethod = s[5].TrimStart('\"');
                 sucessRate = s[8];
@@ -164,13 +164,14 @@ namespace LogFileAnalyssis
                 }
                 else
                 {
-                    url = "";
-                    userAgent = "";
-                    logFormatType = "common";
+                    //url = "";
+                    //userAgent = "";
+                    //logFormatType = "common";
                 }
               //  Add();
             }
         }
+
         private String dateParse(String dateTime)
         {
             //dateTime = dateTime.TrimStart();
@@ -200,6 +201,7 @@ namespace LogFileAnalyssis
                 return "12/" + dateTime.Substring(1, 2) + dateTime.Substring(7, 5) + " " + dateTime.Substring(13, 8);
             return dateTime.Substring(4,2) + dateTime.Substring(1, 2) + dateTime.Substring(6, 5) + " " + dateTime.Substring(12, 8);
         }
+
         private String dateParseBritishFormat(String dateTime)
         {
             //dateTime = dateTime.TrimStart();
@@ -229,11 +231,13 @@ namespace LogFileAnalyssis
                 return dateTime.Substring(1, 3) + "12" + dateTime.Substring(7, 5) + " " + dateTime.Substring(13, 8);
             return dateTime.Substring(1, 3) + dateTime.Substring(4, 2) + dateTime.Substring(7, 5) + " " + dateTime.Substring(12, 8);
         }
+
         private void SetConnection()
         {
             sql_con = new SQLiteConnection
                 ("Data Source=RequestTable;Version=3;New=False;Compress=True;");
         }
+
         private void ExecuteQuery(string txtQuery)
         {
             try
@@ -250,6 +254,7 @@ namespace LogFileAnalyssis
             
             }
             }
+
         private void LoadData()
         {
             //SetConnection();
@@ -263,6 +268,7 @@ namespace LogFileAnalyssis
             //Grid.DataSource = DT;
             //sql_con.Close();
         }
+
         private void Add()
 {
     int i = 9;
@@ -357,31 +363,26 @@ ExecuteQuery(txtSQLQuery);
 
         private void Button_Click_2(object sender, RoutedEventArgs e)
         {
-            //ThreadStart childref = new ThreadStart(CoreProcessing);
-            //Thread childThread = new Thread(childref);
-            //childThread.Start();
-
-            //ThreadStart statusTheread = new ThreadStart(UpdateStatusBar);
-            //Thread cstatusThread = new Thread(statusTheread);
-            //cstatusThread.Start();
-            statusBar.Content = "hsfjkadhgk";
+            
+            //statusBar.Content = "hsfjkadhgk";
             //sessionTime = float.Parse(sessionTimeComboBox.SelectedValue.ToString());
             if (!filePathString.Equals(""))
             {
                 win.IsEnabled = false;
                 this.IsEnabled = false;
                 StreamReader reader = new StreamReader(filePathString);
-
+                countLines = 0;
                 statusBar.Content = "Please Wait (Parsing the log file...)";
                 string line;
                 Thread loadingAnimation = new Thread(new ThreadStart(CustomAnimation));
                 while ((line = reader.ReadLine()) != null)
                 {
                    
-                    String[] s = line.Split();
+                    //String[] s = line.Split();
 
                     requestList.Add(new Request(line));
-                    countLines++;
+                    //if(countLines==-1)
+                    //countLines++;
                     if ((bool)sessionTimeCheckBox.IsChecked)
                     {
                         sessionTime = float.Parse(sessionTimeComboBox.SelectedValue.ToString());
@@ -398,7 +399,6 @@ ExecuteQuery(txtSQLQuery);
                         sessionNametoIdhashtable.Add(requestList[countLines].userName + " " + requestList[countLines].userAgent + sessionTag, sessionId);
                         session.Add(new Session(sessionId , requestList[countLines].userName , requestList[countLines].userAgent , type1.ToArray() , type2.ToArray() , type3.ToArray() ,type4.ToArray()));
                         session[sessionId].sessionStartTime = requestList[countLines].timeStamp;
-                       
                         session[sessionId].requestIdlist.Add(countLines);
                         UpdateSessionClassVariables();
                     }
@@ -408,16 +408,27 @@ ExecuteQuery(txtSQLQuery);
                         UpdateSessionClassVariables();
 
                     }
+                   // try
+                   // {
+                    
+                        requestList.Clear();
+                    //}
+                   // catch(Exception ex)
+                   // {}
                 }
+                SetConnection();
+                sql_con.Open();
                 CleanDataBase();
-
+                //Thread.Sleep(1000);
+                statusBar.Content = "Database operations..";
+              
                 /* code for inserting into database */
                 statusBar.Content = "Please Wait (Inserting session detailsinto database...)";
                 for (int i = 0; i < sessionId - 1; i++)
                 {
                   UpdateDataBase(i);
                 }
-                
+                sql_con.Close();
                 statusBar.Content = "Processing Completed...";
                 reader.Close();
                 loadingAnimation.Abort();
@@ -591,12 +602,12 @@ ExecuteQuery(txtSQLQuery);
         {
             try
             {
-                SetConnection();
-                sql_con.Open();
+                
+                
                 sql_cmd = sql_con.CreateCommand();
                 sql_cmd.CommandText = txtQuery;
                 sql_cmd.ExecuteNonQuery();
-                sql_con.Close();
+                
             }
             catch (Exception e)
             { }
