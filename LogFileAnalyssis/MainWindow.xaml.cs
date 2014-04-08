@@ -21,6 +21,7 @@ using System.Collections;
 using System.Data.SqlClient;
 using OxyPlot;
 using OxyPlot.Series;
+using System.Diagnostics;
 
 namespace LogFileAnalyssis
 {
@@ -257,16 +258,7 @@ namespace LogFileAnalyssis
 
         private void LoadData()
         {
-            //SetConnection();
-            //sql_con.Open();
-            //sql_cmd = sql_con.CreateCommand();
-            //string CommandText = "select id, desc from mains";
-            //DB = new SQLiteDataAdapter(CommandText, sql_con);
-            //DS.Reset();
-            //DB.Fill(DS);
-            //DT = DS.Tables[0];
-            //Grid.DataSource = DT;
-            //sql_con.Close();
+           
         }
 
         private void Add()
@@ -278,7 +270,144 @@ ExecuteQuery(txtSQLQuery);
 }
     }
 
+    public class CsvRow : List<string>
+    {
+        public string LineText { get; set; }
+    }
 
+    /// <summary>
+    /// Class to write data to a CSV file
+    /// </summary>
+    public class CsvFileWriter : StreamWriter
+    {
+        public CsvFileWriter(Stream stream)
+            : base(stream)
+        {
+        }
+
+        public CsvFileWriter(string filename)
+            : base(filename)
+        {
+        }
+
+        /// <summary>
+        /// Writes a single row to a CSV file.
+        /// </summary>
+        /// <param name="row">The row to be written</param>
+        public void WriteRow(CsvRow row)
+        {
+            StringBuilder builder = new StringBuilder();
+            bool firstColumn = true;
+            foreach (string value in row)
+            {
+                // Add separator if this isn't the first value
+                if (!firstColumn)
+                    builder.Append(',');
+                // Implement special handling for values that contain comma or quote
+                // Enclose in quotes and double up any double quotes
+                if (value.IndexOfAny(new char[] { '"', ',' }) != -1)
+                    builder.AppendFormat("\"{0}\"", value.Replace("\"", "\"\""));
+                else
+                    builder.Append(value);
+                firstColumn = false;
+            }
+            row.LineText = builder.ToString();
+            WriteLine(row.LineText);
+        }
+    }
+
+    /// <summary>
+    /// Class to read data from a CSV file
+    /// </summary>
+    public class CsvFileReader : StreamReader
+    {
+        public CsvFileReader(Stream stream)
+            : base(stream)
+        {
+        }
+
+        public CsvFileReader(string filename)
+            : base(filename)
+        {
+        }
+
+        /// <summary>
+        /// Reads a row of data from a CSV file
+        /// </summary>
+        /// <param name="row"></param>
+        /// <returns></returns>
+        public bool ReadRow(CsvRow row)
+        {
+            row.LineText = ReadLine();
+            if (String.IsNullOrEmpty(row.LineText))
+                return false;
+
+            int pos = 0;
+            int rows = 0;
+
+            while (pos < row.LineText.Length)
+            {
+                string value;
+
+                // Special handling for quoted field
+                if (row.LineText[pos] == '"')
+                {
+                    // Skip initial quote
+                    pos++;
+
+                    // Parse quoted value
+                    int start = pos;
+                    while (pos < row.LineText.Length)
+                    {
+                        // Test for quote character
+                        if (row.LineText[pos] == '"')
+                        {
+                            // Found one
+                            pos++;
+
+                            // If two quotes together, keep one
+                            // Otherwise, indicates end of value
+                            if (pos >= row.LineText.Length || row.LineText[pos] != '"')
+                            {
+                                pos--;
+                                break;
+                            }
+                        }
+                        pos++;
+                    }
+                    value = row.LineText.Substring(start, pos - start);
+                    value = value.Replace("\"\"", "\"");
+                }
+                else
+                {
+                    // Parse unquoted value
+                    int start = pos;
+                    while (pos < row.LineText.Length && row.LineText[pos] != ',')
+                        pos++;
+                    value = row.LineText.Substring(start, pos - start);
+                }
+
+                // Add field to list
+                if (rows < row.Count)
+                    row[rows] = value;
+                else
+                    row.Add(value);
+                rows++;
+
+                // Eat up to and including next comma
+                while (pos < row.LineText.Length && row.LineText[pos] != ',')
+                    pos++;
+                if (pos < row.LineText.Length)
+                    pos++;
+            }
+            // Delete any unused items
+            while (row.Count > rows)
+                row.RemoveAt(rows);
+
+            // Return true if any columns read
+            return (row.Count > 0);
+        }
+    }
     public partial class MainWindow : Window
     {
 
@@ -363,7 +492,12 @@ ExecuteQuery(txtSQLQuery);
 
         private void Button_Click_2(object sender, RoutedEventArgs e)
         {
-            
+
+            ThreadStart childref = new ThreadStart(CallToChildThread);
+            //Console.WriteLine("In Main: Creating the Child thread");
+            Thread childThread = new Thread(childref);
+            childThread.Start();
+
             //statusBar.Content = "hsfjkadhgk";
             //sessionTime = float.Parse(sessionTimeComboBox.SelectedValue.ToString());
             if (!filePathString.Equals(""))
@@ -408,27 +542,16 @@ ExecuteQuery(txtSQLQuery);
                         UpdateSessionClassVariables();
 
                     }
-                   // try
-                   // {
+                   
                     
                         requestList.Clear();
-                    //}
-                   // catch(Exception ex)
-                   // {}
+                    
                 }
-                SetConnection();
-                sql_con.Open();
+                
                 CleanDataBase();
-                //Thread.Sleep(1000);
-                statusBar.Content = "Database operations..";
-              
-                /* code for inserting into database */
-                statusBar.Content = "Please Wait (Inserting session detailsinto database...)";
-                for (int i = 0; i < sessionId - 1; i++)
-                {
-                  UpdateDataBase(i);
-                }
-                sql_con.Close();
+                bulkInsertDatabase();
+                
+
                 statusBar.Content = "Processing Completed...";
                 reader.Close();
                 loadingAnimation.Abort();
@@ -440,6 +563,189 @@ ExecuteQuery(txtSQLQuery);
 
             win.IsEnabled = true;
           
+        }
+
+        public void CallToChildThread()
+        {
+            
+        }
+
+        private void bulkInsertDatabase()
+        {
+            sql_con = new SQLiteConnection("Data Source=RequestTable;Version=3;New=False;Compress=True;");
+            sql_con.Open();
+            sql_cmd = sql_con.CreateCommand();
+            
+            using (var transaction = sql_con.BeginTransaction())
+            {
+                // 100,000 inserts
+                for (var tempSessionId = 0; tempSessionId < sessionId - 1 ; tempSessionId++)
+                {
+                    try
+                    {
+                        int p1 = tempSessionId;
+                        long p2 = session[tempSessionId].totalNoOfPagesRequestedInSession;
+                        float p3 = ((float)session[tempSessionId].noOfImagePagesRequestedInSession / p2) * 100;
+                        float p4 = ((float)session[tempSessionId].noOfBinaryDocumentsRequestedInSession / p2) * 100;
+                        float p5 = ((float)session[tempSessionId].noOfBinaryExeFileRequestedInSession / p2) * 100;
+                        String p6 = session[tempSessionId].isRobotstxtVisited.ToString();
+                        float p7 = ((float)session[tempSessionId].noOfHTMLFileRequestedInSession / p2) * 100;
+                        float p8 = ((float)session[tempSessionId].noOfAsciiFilerequestedInSession / p2) * 100;
+                        float p9 = ((float)session[tempSessionId].noOfCompressedFileRequestedInSession / p2) * 100;
+                        float p10 = ((float)session[tempSessionId].noOfMultimediaFileRequestedInSession / p2) * 100;
+                        float p11 = ((float)session[tempSessionId].noOfOtherFileFormatRequestedInSession / p2) * 100;
+                        float p12 = System.Math.Abs(session[tempSessionId].totalTimeOfTheSession);
+                        float p13 = System.Math.Abs(session[tempSessionId].avgTimeBetweenTowHTMLRequests);
+                        long p14 = session[tempSessionId].noOfPagesRequestedInNightTime;
+                        long p15 = session[tempSessionId].noOfRequestReapted;
+                        float p16 = ((float)session[tempSessionId].onOfrequestesWithErrors / p2) * 100;
+                        float p17 = ((float)session[tempSessionId].noOfRequestWithGETMethod / p2) * 100;
+                        float p18 = ((float)session[tempSessionId].noOfRequestWithPOSTMethod / p2) * 100;
+                        float p19 = ((float)session[tempSessionId].noOfRequestWithHEADMethod / p2) * 100;
+                        float p20 = ((float)session[tempSessionId].noOfRequestWithOtherMethod / p2) * 100;
+                        long p21 = session[tempSessionId].depthOfTheTraversal;
+                        long p22 = session[tempSessionId].noOfHTMLFileRequestedInSession;
+                        float p23 = ((float)session[tempSessionId].noOfRequestWithUnassignedReferer / p2) * 100;
+                        String p24 = session[tempSessionId].isMultipleIPSEssion.ToString();
+                        String p25 = session[tempSessionId].isMultiAgentSession.ToString();
+                        String p26 = session[tempSessionId].sessionUsername.ToString();
+                        String p27 = session[tempSessionId].sessionUseragent.ToString();
+                        int p28 = session[tempSessionId].sessionType;
+                        String p29 = session[tempSessionId].isRobotSession.ToString();
+                        sql_cmd.CommandText = "insert into  session values ('" + p1 + "','" + p2 + "','" + p3 + "','" + p4 + "','" + p5 + "','" + p6 + "','" + p7 + "','" + p8 + "','" + p9 + "','" + p10 + "','" + p11 + "','" + p12 + "','" + p13 + "','" + p14 + "','" + p15 + "','" + p16 + "','" + p17 + "','" + p18 + "','" + p19 + "','" + p20 + "','" + p21 + "','" + p22 + "','" + p23 + "','" + p24 + "','" + p25 + "','" + p26 + "','" + p27 + "','" + p28 + "','" + p29 + "')";
+                        sql_cmd.ExecuteNonQuery();
+                    }
+                    catch(Exception ex)
+                    {
+                    
+                    }
+                }
+
+                transaction.Commit();
+            }
+            //    }
+
+            //    Console.WriteLine("{0} seconds with one transaction.", stopwatch.Elapsed.TotalSeconds);
+
+            //    conn.Close();
+            //}
+            //throw new NotImplementedException();
+        }
+        private void insertCSVFile()
+        {
+            using (CsvFileWriter writer = new CsvFileWriter("Session.csv"))
+            {
+
+                CsvRow row1 = new CsvRow();
+                row1.Add(String.Format("sessionId"));
+                row1.Add(String.Format("totalPages"));
+                row1.Add(String.Format("percentageImagePages"));
+                row1.Add(String.Format("percentageBinaryDocPages"));
+                row1.Add(String.Format("percentageBinaryExePages"));
+                row1.Add(String.Format("isRobotstxtVisited"));
+                row1.Add(String.Format("percentageHTMLPages"));
+                row1.Add(String.Format("percentageAsciiPages"));
+                row1.Add(String.Format("percentageCompressedFilePages"));
+                row1.Add(String.Format("percentageMultimediaPages"));
+                row1.Add(String.Format("percentageOtherPages"));
+                row1.Add(String.Format("totalSessionTime"));
+                row1.Add(String.Format("avgHTMLReqTime"));
+                row1.Add(String.Format("totalNightTimeReq"));
+                row1.Add(String.Format("totalReapeatedReq"));
+                row1.Add(String.Format("percentageOfErrorPages"));
+                row1.Add(String.Format("percentageGETMethodReq"));
+                row1.Add(String.Format("percentagePOSTMethodReq"));
+                row1.Add(String.Format("percentageHEADMethodReq"));
+                row1.Add(String.Format("percentageOtherMethodReq"));
+                row1.Add(String.Format("depthOfTraversal"));
+                row1.Add(String.Format("lengthOfSession"));
+                row1.Add(String.Format("percentageReqWithUnassignedReferrer"));
+                row1.Add(String.Format("isSessionMultiIP"));
+                row1.Add(String.Format("isSessionMultiAgent"));
+                row1.Add(String.Format("sessionUsername"));
+                row1.Add(String.Format("sessionUseragent"));
+                row1.Add(String.Format("useAgentType"));
+                row1.Add(String.Format("isRobotSession"));
+                writer.WriteRow(row1);
+
+                for (var tempSessionId = 0; tempSessionId < 100 ; tempSessionId++)
+                {
+                    try
+                    {
+                        int p1 = tempSessionId;
+                        long p2 = session[tempSessionId].totalNoOfPagesRequestedInSession;
+                        float p3 = ((float)session[tempSessionId].noOfImagePagesRequestedInSession / p2) * 100;
+                        float p4 = ((float)session[tempSessionId].noOfBinaryDocumentsRequestedInSession / p2) * 100;
+                        float p5 = ((float)session[tempSessionId].noOfBinaryExeFileRequestedInSession / p2) * 100;
+                        String p6 = session[tempSessionId].isRobotstxtVisited.ToString();
+                        float p7 = ((float)session[tempSessionId].noOfHTMLFileRequestedInSession / p2) * 100;
+                        float p8 = ((float)session[tempSessionId].noOfAsciiFilerequestedInSession / p2) * 100;
+                        float p9 = ((float)session[tempSessionId].noOfCompressedFileRequestedInSession / p2) * 100;
+                        float p10 = ((float)session[tempSessionId].noOfMultimediaFileRequestedInSession / p2) * 100;
+                        float p11 = ((float)session[tempSessionId].noOfOtherFileFormatRequestedInSession / p2) * 100;
+                        float p12 = System.Math.Abs(session[tempSessionId].totalTimeOfTheSession);
+                        float p13 = System.Math.Abs(session[tempSessionId].avgTimeBetweenTowHTMLRequests);
+                        long p14 = session[tempSessionId].noOfPagesRequestedInNightTime;
+                        long p15 = session[tempSessionId].noOfRequestReapted;
+                        float p16 = ((float)session[tempSessionId].onOfrequestesWithErrors / p2) * 100;
+                        float p17 = ((float)session[tempSessionId].noOfRequestWithGETMethod / p2) * 100;
+                        float p18 = ((float)session[tempSessionId].noOfRequestWithPOSTMethod / p2) * 100;
+                        float p19 = ((float)session[tempSessionId].noOfRequestWithHEADMethod / p2) * 100;
+                        float p20 = ((float)session[tempSessionId].noOfRequestWithOtherMethod / p2) * 100;
+                        long p21 = session[tempSessionId].depthOfTheTraversal;
+                        long p22 = session[tempSessionId].noOfHTMLFileRequestedInSession;
+                        float p23 = ((float)session[tempSessionId].noOfRequestWithUnassignedReferer / p2) * 100;
+                        String p24 = session[tempSessionId].isMultipleIPSEssion.ToString();
+                        String p25 = session[tempSessionId].isMultiAgentSession.ToString();
+                        String p26 = session[tempSessionId].sessionUsername.ToString();
+                        String p27 = session[tempSessionId].sessionUseragent.ToString();
+                        int p28 = session[tempSessionId].sessionType;
+                        String p29 = session[tempSessionId].isRobotSession.ToString();
+                        CsvRow row = new CsvRow();
+                        row.Add(String.Format(p1.ToString()));
+                        row.Add(String.Format(p2.ToString()));
+                        row.Add(String.Format(p3.ToString()));
+                        row.Add(String.Format(p4.ToString()));
+                        row.Add(String.Format(p5.ToString()));
+                        row.Add(String.Format(p6.ToString()));
+                        row.Add(String.Format(p7.ToString()));
+                        row.Add(String.Format(p8.ToString()));
+                        row.Add(String.Format(p9.ToString()));
+                        row.Add(String.Format(p10.ToString()));
+                        row.Add(String.Format(p11.ToString()));
+                        row.Add(String.Format(p12.ToString()));
+                        row.Add(String.Format(p13.ToString()));
+                        row.Add(String.Format(p14.ToString()));
+                        row.Add(String.Format(p15.ToString()));
+                        row.Add(String.Format(p16.ToString()));
+                        row.Add(String.Format(p17.ToString()));
+                        row.Add(String.Format(p18.ToString()));
+                        row.Add(String.Format(p19.ToString()));
+                        row.Add(String.Format(p20.ToString()));
+                        row.Add(String.Format(p21.ToString()));
+                        row.Add(String.Format(p22.ToString()));
+                        row.Add(String.Format(p23.ToString()));
+                        row.Add(String.Format(p24.ToString()));
+                        row.Add(String.Format(p25.ToString()));
+                        row.Add(String.Format(p26.ToString()));
+                        row.Add(String.Format(p27.ToString()));
+                        row.Add(String.Format(p28.ToString()));
+                        row.Add(String.Format(p29.ToString()));
+                        writer.WriteRow(row);
+                    }
+                    catch(Exception ex)
+                    {
+                    
+                    }
+                }
+                //for (int i = 0; i < 100; i++)
+                //{
+                //    CsvRow row = new CsvRow();
+                //    for (int j = 0; j < 5; j++)
+                //        row.Add(String.Format("Column{0}", j));
+                //    writer.WriteRow(row);
+                //}
+            }
         }
 
         private void CleanDataBase()
@@ -586,8 +892,8 @@ ExecuteQuery(txtSQLQuery);
                 int p28 = session[tempSessionId].sessionType;
                 String p29 = session[tempSessionId].isRobotSession.ToString();
 
-                string txtSQLQuery = "insert into  session values ('" + p1 + "','" + p2 + "','" + p3 + "','" + p4 + "','" + p5 + "','" + p6 + "','" + p7 + "','" + p8 + "','" + p9 + "','" + p10 + "','" + p11 + "','" + p12 + "','" + p13 + "','" + p14 + "','" + p15 + "','" + p16 + "','" + p17 + "','" + p18 + "','" + p19 + "','" + p20 + "','" + p21 + "','" + p22 + "','" + p23 + "','" + p24 + "','" + p25 + "','" + p26 + "','" + p27 + "','" + p28 + "','" + p29 + "')";
-                ExecuteQuery(txtSQLQuery);
+                //string txtSQLQuery = "insert into  session values ('" + p1 + "','" + p2 + "','" + p3 + "','" + p4 + "','" + p5 + "','" + p6 + "','" + p7 + "','" + p8 + "','" + p9 + "','" + p10 + "','" + p11 + "','" + p12 + "','" + p13 + "','" + p14 + "','" + p15 + "','" + p16 + "','" + p17 + "','" + p18 + "','" + p19 + "','" + p20 + "','" + p21 + "','" + p22 + "','" + p23 + "','" + p24 + "','" + p25 + "','" + p26 + "','" + p27 + "','" + p28 + "','" + p29 + "')";
+                //ExecuteQuery(txtSQLQuery);
             }
             catch(Exception e)
             {}
@@ -704,13 +1010,7 @@ ExecuteQuery(txtSQLQuery);
         {
             try
             {
-               // statusBar.Content = "2";
-                //SqLiteConnection connection1 =  new SQLiteConnection("Data Source=RequestTable;Version=3;New=False;Compress=True;");
-                //{
-                //    //SetConnection();
-                //    string query = "SELECT * FROM session";
-                //    SQLiteCommand command = new SQLiteCommand(query, connection1);
-                    //connection1.Open();
+               
                 SetConnection();
             sql_con.Open();
                 sql_cmd = sql_con.CreateCommand();
@@ -763,6 +1063,16 @@ ExecuteQuery(txtSQLQuery);
                     ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
                 }
             }
+        }
+
+        private void minimize_Click(object sender, RoutedEventArgs e)
+        {
+            this.WindowState = WindowState.Minimized;
+        }
+
+        private void generateCSVFile_Click(object sender, RoutedEventArgs e)
+        {
+            insertCSVFile();
         }
 
         
