@@ -412,6 +412,7 @@ ExecuteQuery(txtSQLQuery);
     {
 
         public String filePathString = "";
+        public static List<Session> sessionforExport = new List<Session>();
         Hashtable sessionNametoIdhashtable = new Hashtable();
         List<Session> session = new List<Session>();
         List<Request> requestList = new List<Request>();
@@ -483,7 +484,10 @@ ExecuteQuery(txtSQLQuery);
         public PlotModel MyModel { get; private set; }
         private void Button_Click_1(object sender, RoutedEventArgs e)
         {
-            Close();
+            sessionforExport = session;
+            Export_Settings frm = new Export_Settings();
+            frm.Show();
+            //Close();
            
         }
 
@@ -631,6 +635,9 @@ ExecuteQuery(txtSQLQuery);
             //}
             //throw new NotImplementedException();
         }
+        
+        
+
         private void insertCSVFile()
         {
             using (CsvFileWriter writer = new CsvFileWriter("Session.csv"))
@@ -750,6 +757,9 @@ ExecuteQuery(txtSQLQuery);
 
         private void CleanDataBase()
         {
+            sql_con = new SQLiteConnection("Data Source=RequestTable;Version=3;New=False;Compress=True;");
+            sql_con.Open();
+            sql_cmd = sql_con.CreateCommand();
             string txtSQLQuery = "Delete from session" ;
             ExecuteQuery(txtSQLQuery);
         }
@@ -921,7 +931,7 @@ ExecuteQuery(txtSQLQuery);
 
         private void LoadData(String selectQuery)
         {
-            SetConnection();
+            sql_con = new SQLiteConnection("Data Source=RequestTable;Version=3;New=False;Compress=True;");
             sql_con.Open();
             sql_cmd = sql_con.CreateCommand();
             string CommandText = selectQuery;
@@ -1038,9 +1048,15 @@ ExecuteQuery(txtSQLQuery);
         private void classify_Click(object sender, RoutedEventArgs e)
         {
            // dataBaseOperationForClassification();
-            statusBar.Content = "Detecting Robots sessions...";
+            
+            statusBar.Content = "Labeling sessions...";
             LoadData("select sessionId , isRobotstxtVisited , percentageHEADMethodReq , percentageReqWithUnassignedReferrer , sessionUsername , sessionUseragent , useAgentType from session");
             int lableCount = 0;
+            sql_con = new SQLiteConnection("Data Source=RequestTable;Version=3;New=False;Compress=True;");
+            sql_con.Open();
+            sql_cmd = sql_con.CreateCommand();
+            //ExecuteQuery("UPDATE test SET test2='beeeeee' where test1 = '1'");
+            //statusBar.Content = DT.Rows[3]["sessionUsername"].ToString();
             for (;lableCount<DT.Rows.Count ;lableCount++)
             {
                 if (DT.Rows[lableCount]["isRobotstxtVisited"].ToString().Equals("True"))
@@ -1063,6 +1079,8 @@ ExecuteQuery(txtSQLQuery);
                     ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
                 }
             }
+
+            statusBar.Content = "Session Labeling completed...";
         }
 
         private void minimize_Click(object sender, RoutedEventArgs e)
@@ -1072,7 +1090,19 @@ ExecuteQuery(txtSQLQuery);
 
         private void generateCSVFile_Click(object sender, RoutedEventArgs e)
         {
-            insertCSVFile();
+            //insertCSVFile();
+          
+        }
+
+        private void closeApp(object sender, RoutedEventArgs e)
+        {
+            Close();
+        }
+
+        private void userAgentSettings(object sender, RoutedEventArgs e)
+        {
+            UserAgentsSettings frm = new UserAgentsSettings();
+            frm.Show();
         }
 
         

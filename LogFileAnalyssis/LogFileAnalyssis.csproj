@@ -70,7 +70,17 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="Export Settings.xaml.cs">
+      <DependentUpon>Export Settings.xaml</DependentUpon>
+    </Compile>
     <Compile Include="SqLiteConnection.cs" />
+    <Compile Include="UserAgentsSettings.xaml.cs">
+      <DependentUpon>UserAgentsSettings.xaml</DependentUpon>
+    </Compile>
+    <Page Include="Export Settings.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="MainWindow.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
@@ -84,6 +94,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="UserAgentsSettings.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs">
@@ -119,6 +133,9 @@
     <Resource Include="images\Settings.jpg" />
     <Resource Include="images\Settings.png" />
     <Resource Include="images\UserAgents.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="images\export.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
