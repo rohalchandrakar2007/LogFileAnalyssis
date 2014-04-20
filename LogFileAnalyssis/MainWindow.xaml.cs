@@ -97,9 +97,9 @@ namespace LogFileAnalyssis
             isRobotstxtVisited = false;
             noOfRequestWithHEADMethod = 0;
             noOfRequestWithUnassignedReferer = 0;
-
-            sessionUsername = un;
-            sessionUseragent = ua;
+            //input.Replace("\"", "");
+            sessionUsername = un.Replace("\"", "");
+            sessionUseragent = ua.Replace("\"", "");
             sessionType = getSessionType(ua, type1, type2, type3, type4);
             isRobotSession = false;
             
@@ -551,7 +551,7 @@ ExecuteQuery(txtSQLQuery);
                         requestList.Clear();
                     
                 }
-                
+                //statusBar.Content = session[0].sessionUseragent;
                 CleanDataBase();
                 bulkInsertDatabase();
                 
@@ -559,6 +559,7 @@ ExecuteQuery(txtSQLQuery);
                 statusBar.Content = "Processing Completed...";
                 reader.Close();
                 loadingAnimation.Abort();
+                sessionforExport = session;
             }
             else
             {
@@ -636,8 +637,6 @@ ExecuteQuery(txtSQLQuery);
             //throw new NotImplementedException();
         }
         
-        
-
         private void insertCSVFile()
         {
             using (CsvFileWriter writer = new CsvFileWriter("Session.csv"))
@@ -1062,6 +1061,7 @@ ExecuteQuery(txtSQLQuery);
                 if (DT.Rows[lableCount]["isRobotstxtVisited"].ToString().Equals("True"))
                 { 
                     /* Class 1 */
+                    session[lableCount].isRobotSession = true;
                     ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
                 }
                 if (DT.Rows[lableCount]["useAgentType"].ToString().Equals("2") || DT.Rows[lableCount]["useAgentType"].ToString().Equals("4") || DT.Rows[lableCount]["useAgentType"].ToString().Equals("0"))
@@ -1070,6 +1070,7 @@ ExecuteQuery(txtSQLQuery);
                     if (DT.Rows[lableCount]["percentageHEADMethodReq"].ToString().Equals("100") || (DT.Rows[lableCount]["percentageReqWithUnassignedReferrer"].ToString().Equals("100") && !DT.Rows[lableCount]["percentageReqWithUnassignedReferrer"].ToString().Equals("")))
                     {
                         /* Class 1 */
+                        session[lableCount].isRobotSession = true;
                         ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
                     }
                 }
@@ -1079,7 +1080,7 @@ ExecuteQuery(txtSQLQuery);
                     ExecuteQuery("UPDATE session SET isRobotSession='True' WHERE sessionId ='" + DT.Rows[lableCount]["sessionId"].ToString() + "'");
                 }
             }
-
+            sessionforExport = session;
             statusBar.Content = "Session Labeling completed...";
         }
 
